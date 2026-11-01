@@ -1,0 +1,11 @@
+# Build output
+/agent-shift
+/agent-shift.exe
+*.exe~
+/dist/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
