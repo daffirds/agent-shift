@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="440" viewBox="0 0 1280 440" role="img" aria-labelledby="t d">
+  <title id="t">agent-shift</title>
+  <desc id="d">On the left, a Slack thread: a ticket posted by a workflow, a teammate's reply, and the fix posted back from your account. On the right, the Claude Code session on your machine that the ticket started; the teammate's reply arrives in it mid-turn. In the middle, agent-shift relays the message in, steers the reply in, and carries the agent's tool calls back to Slack.</desc>
+  <defs>
+    <linearGradient id="in" gradientUnits="userSpaceOnUse" x1="516" y1="0" x2="764" y2="0"><stop offset="0" stop-color="#b083f0"/><stop offset="1" stop-color="#f0a030"/></linearGradient>
+    <linearGradient id="out" gradientUnits="userSpaceOnUse" x1="764" y1="0" x2="516" y2="0"><stop offset="0" stop-color="#f0a030"/><stop offset="1" stop-color="#b083f0"/></linearGradient>
+    <linearGradient id="band" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#b083f0" stop-opacity="0.16"/><stop offset="1" stop-color="#f0a030" stop-opacity="0.16"/></linearGradient>
+  </defs>
+  <rect x="1" y="1" width="1278" height="438" rx="24" fill="#0d1117" stroke="#30363d" stroke-width="2"/>
+
+  <text x="48" y="46" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="13" letter-spacing="2" fill="#8b949e">THE THREAD IN SLACK</text>
+  <text x="1232" y="46" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="13" letter-spacing="2" fill="#8b949e">THE SESSION ON YOUR MACHINE</text>
+
+  <g>
+    <rect x="48" y="64" width="468" height="308" rx="14" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+    <text x="72" y="94" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#e6edf3"># tickets</text>
+    <text x="492" y="94" text-anchor="end" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="13" fill="#8b949e">thread · 2 replies</text>
+    <line x1="48" y1="108" x2="516" y2="108" stroke="#30363d" stroke-width="1.5"/>
+
+    <rect x="72" y="124" width="36" height="36" rx="8" fill="#b083f0"/>
+    <path d="M92 130 l-9 13 h7 l-3 11 l10 -14 h-7 z" fill="#0d1117"/>
+    <text font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" y="138">
+      <tspan x="120" font-weight="700" fill="#e6edf3">Ticket intake</tspan>
+      <tspan dx="10" font-size="11" letter-spacing="1" fill="#8b949e">WORKFLOW</tspan>
+      <tspan dx="10" font-size="13" fill="#8b949e">10:02</tspan>
+    </text>
+    <text x="120" y="162" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" fill="#e6edf3">New ticket: checkout 500s with gift cards</text>
+    <rect x="120" y="176" width="52" height="24" rx="12" fill="none" stroke="#30363d" stroke-width="1.5"/>
+    <text x="146" y="193" text-anchor="middle" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="13" fill="#e6edf3">✅ 1</text>
+
+    <line x1="90" y1="168" x2="90" y2="326" stroke="#30363d" stroke-width="2"/>
+
+    <circle cx="106" cy="245" r="13" fill="#8b949e"/>
+    <text x="106" y="250" text-anchor="middle" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#0d1117">B</text>
+    <text font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" y="250">
+      <tspan x="130" font-weight="700" fill="#e6edf3">Budi</tspan>
+      <tspan dx="10" font-size="13" fill="#8b949e">10:09</tspan>
+    </text>
+    <text x="130" y="272" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" fill="#e6edf3">fyi it only happens with IDR</text>
+
+    <circle cx="106" cy="307" r="13" fill="#b083f0"/>
+    <text x="106" y="312" text-anchor="middle" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#0d1117">A</text>
+    <text font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" y="312">
+      <tspan x="130" font-weight="700" fill="#e6edf3">Ana</tspan>
+      <tspan dx="10" font-size="13" fill="#8b949e">10:21</tspan>
+    </text>
+    <text x="130" y="334" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="15" fill="#e6edf3">Fixed: rounding ran before FX. Draft PR #412</text>
+    <text x="130" y="354" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" fill="#8b949e">Assisted by Claude</text>
+  </g>
+
+  <g>
+    <rect x="764" y="64" width="468" height="308" rx="14" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+    <circle cx="790" cy="89" r="6" fill="#30363d"/>
+    <circle cx="808" cy="89" r="6" fill="#30363d"/>
+    <circle cx="826" cy="89" r="6" fill="#30363d"/>
+    <text x="848" y="94" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="13" fill="#8b949e">claude -p --input-format=stream-json</text>
+    <line x1="764" y1="108" x2="1232" y2="108" stroke="#30363d" stroke-width="1.5"/>
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="14.5">
+    <text x="788" y="138"><tspan fill="#f0a030" font-weight="700">→</tspan><tspan dx="9" fill="#e6edf3">A new Slack message matched your trigger.</tspan></text>
+    <text x="788" y="162" fill="#8b949e"><tspan dx="18">⚙</tspan><tspan dx="9" fill="#f0a030">slack_react</tspan><tspan dx="9">eyes</tspan></text>
+    <text x="788" y="186" fill="#8b949e"><tspan dx="18">⚙</tspan><tspan dx="9" fill="#f0a030">Bash</tspan><tspan dx="9">go test ./checkout/...</tspan></text>
+    <text x="788" y="210" fill="#8b949e"><tspan dx="18">⚙</tspan><tspan dx="9" fill="#f0a030">Edit</tspan><tspan dx="9">checkout/total.go</tspan></text>
+    <text x="788" y="260"><tspan fill="#f0a030" font-weight="700">→</tspan><tspan dx="9" fill="#e6edf3">New reply in your Slack thread from Budi</tspan></text>
+    <text x="788" y="310" fill="#8b949e"><tspan dx="18">⚙</tspan><tspan dx="9" fill="#f0a030">Bash</tspan><tspan dx="9">gh pr create --draft</tspan></text>
+    <text x="788" y="334" fill="#8b949e"><tspan dx="18">⚙</tspan><tspan dx="9" fill="#f0a030">slack_reply</tspan><tspan dx="9">&quot;Fixed: rounding ran before FX…&quot;</tspan></text>
+    <text x="788" y="358" fill="#8b949e"><tspan dx="18">■ turn done (success)</tspan></text>
+    </g>
+  </g>
+
+  <!-- the steer: a reply in the thread lands in the running turn -->
+  <rect x="49" y="226" width="1182" height="58" fill="url(#band)"/>
+
+  <!-- agent-shift: the relay in the middle -->
+  <rect x="582" y="80" width="116" height="284" rx="58" fill="#0d1117" stroke="#e6edf3" stroke-width="2.5"/>
+  <g transform="translate(640,126)" fill="none" stroke="#e6edf3" stroke-width="2.5" stroke-linecap="round">
+    <circle r="20"/>
+    <line x1="0" y1="0" x2="0" y2="-12"/>
+    <line x1="0" y1="0" x2="9" y2="5"/>
+  </g>
+  
+    <line x1="516" y1="162" x2="760" y2="162" stroke="url(#in)" stroke-width="2.5"/>
+    <path d="M762,162 l-11,-6 v12 z" fill="#f0a030"/>
+    <text x="640" y="182" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="13" letter-spacing="1" fill="#8b949e">trigger</text>
+  
+    <line x1="516" y1="255" x2="760" y2="255" stroke="url(#in)" stroke-width="2.5"/>
+    <path d="M762,255 l-11,-6 v12 z" fill="#f0a030"/>
+    <text x="640" y="275" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="13" letter-spacing="1" fill="#8b949e">steer</text>
+  
+    <line x1="764" y1="324" x2="520" y2="324" stroke="url(#out)" stroke-width="2.5"/>
+    <path d="M518,324 l11,-6 v12 z" fill="#b083f0"/>
+    <text x="640" y="344" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="13" letter-spacing="1" fill="#8b949e">tools</text>
+
+  <text x="640" y="414" text-anchor="middle" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="30" font-weight="700" letter-spacing="12" fill="#e6edf3">AGENT-SHIFT</text>
+</svg>
