@@ -18,9 +18,6 @@ import (
 	"github.com/daffirds/agent-shift/internal/tools"
 )
 
-// reactInterrupt on any thread message interrupts the running turn.
-const reactInterrupt = "octagonal_sign"
-
 // inbound is one thing to deliver to the agent.
 type inbound struct {
 	prompt    string // prebuilt prompt (the trigger message)
@@ -301,9 +298,6 @@ func (s *Session) prepare(batch []inbound) []string {
 			r := in.reaction
 			if !r.Added {
 				continue // removals are noise for the agent
-			}
-			if r.Name == reactInterrupt {
-				s.interrupt("interrupted by a :" + reactInterrupt + ": reaction")
 			}
 			target := in.target
 			if target == nil {

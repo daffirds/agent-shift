@@ -92,8 +92,10 @@ Post a matching message and watch the thread.
   who/where/link.
 - **Steer** — new replies and reactions in the thread go to the same session. If it is busy they are
   injected into the running turn (Claude: streamed input · Codex: `turn/steer`).
-- **Interrupt** — react with 🛑 (`:octagonal_sign:`) on any message of the thread, or run
-  `agent-shift sessions interrupt <id>`. The agent is told and waits for instructions.
+- **Stop** — there is no stop button in Slack. Ask the agent in the thread ("stop", "hold off"); it
+  reaches the running turn like any other reply, and the agent is told to stop when asked. A 🛑 reaction
+  is just a reaction the agent reads. From your terminal, `agent-shift sessions interrupt <id>` cuts
+  the current turn off.
 - **Progress** — the agent is told that nobody sees its progress unless it shows it, and that
   `slack_react` on the trigger message is the quiet way (e.g. 👀 when it starts something long, ✅
   when done); it decides when that's worth it. `agent-shift sessions list` shows what is running.
@@ -230,8 +232,8 @@ agents:
      > `gh pr create --draft`. Reply in the thread with a short summary and the PR link. If the ticket
      > is unclear, ask in the thread and wait for an answer.
 
-Replies in the ticket's thread ("also handle X", "use the staging config") steer the running session;
-🛑 stops it. `agent-shift sessions prune` later removes worktrees of ended sessions (branches are kept).
+Replies in the ticket's thread ("also handle X", "use the staging config") steer the running session,
+and "stop" in the thread stops it. `agent-shift sessions prune` later removes worktrees of ended sessions (branches are kept).
 
 ## 8. Files
 
