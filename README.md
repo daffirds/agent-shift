@@ -23,9 +23,11 @@ directory you chose, with that message as the first prompt. Every later reply an
 message's thread goes into the same session, even while it is working, and the agent answers
 through Slack tools that post from your account.
 
-There is no bot user, no server and no API key. Slack events arrive over an outbound Socket Mode
-WebSocket, so nothing needs a public URL. The CLIs run with their own logins, so the work counts
-against your Claude or ChatGPT subscription. agent-shift itself talks only to Slack and to `127.0.0.1`.
+There is no bot user and no server of your own. agent-shift reads Slack by **polling** with your own
+user token, from a small private Slack app with no event subscription and no Socket Mode. Slack never
+pushes anything, so nothing goes undelivered while your computer is off, and Slack has nothing to turn
+off. Nothing needs a public URL. The CLIs run with their own logins, so the work counts against your
+Claude or ChatGPT subscription. agent-shift itself talks only to `slack.com` and to `127.0.0.1`.
 
 The name: a shift is the stretch of work someone covers so you don't have to be there. agent-shift
 puts an agent on shift in the conversations you choose. It takes what comes in, works on it in the
@@ -43,7 +45,7 @@ thread, and is still there when someone replies.
 An agent is a trigger, a prompt, an engine and a directory:
 
 ```yaml
-# ~/.agent-shift/config.yaml (written for you by `agent-shift agents add`)
+# ~/.agent-shift/config.yaml (written for you by `agent-shift ui`)
 agents:
   - name: ticket-triage
     engine: claude
@@ -91,11 +93,11 @@ picks up the same conversation with `claude --resume`.
 
 ```mermaid
 flowchart LR
-    slack["Slack<br/>(your account)"] -- "Socket Mode<br/>(outbound WebSocket)" --> daemon["agent-shift daemon<br/>match · route · persist"]
+    daemon["agent-shift daemon<br/>poll · match · route · persist"] -- "Web API reads as you<br/>(history · replies · search)" --> slack["Slack<br/>(your account)"]
     daemon -- "top-level match: new session<br/>thread reply: steer the turn" --> cli["claude -p (stream-json)<br/>or codex app-server"]
     cli -- "edits, commands" --> repo["workdir<br/>or git worktree"]
     cli -- "MCP over HTTP<br/>127.0.0.1/mcp/{token}" --> tools["agentshift tools<br/>slack_reply · slack_react · …"]
-    tools -- "Web API as you<br/>(xoxp user token)" --> slack
+    tools -- "Web API as you" --> slack
 
     classDef asyou fill:#f0a03022,stroke:#f0a030
     class cli,tools asyou
@@ -106,7 +108,7 @@ post as you. Everything else only reads, matches or routes.
 
 Four design decisions do most of the work:
 
-* **You are the only identity.** The Slack app has no bot user and holds only user scopes, so the
+* **You are the only identity.** The token is your own user token (`xoxp-…`), not a bot's, so the
   agent reads what you can read and writes as you. Every message it sends carries an
   `Assisted by Claude` / `Assisted by Codex` footer, a context block with the id `agentshift_footer`.
   agent-shift uses that footer, plus the messages, files and reactions each session made, to
@@ -122,11 +124,14 @@ Four design decisions do most of the work:
   idle process is stopped first. The next message brings the process back with the engine's own
   conversation id (`claude --resume`, Codex `thread/resume`). If that fails, a fresh process gets the
   thread's history from Slack.
-* **Slack's history is the record of downtime.** Socket Mode only delivers events while connected, so
-  each workspace keeps a watermark of how far its events were received (`state.json`). On start, on
-  reconnect and on wake from sleep (a heartbeat more than 2 minutes late), agent-shift replays Slack
-  history from 3 minutes before that watermark, at most `catch_up` back, oldest first. Each session
-  records the message timestamps it has seen, so nothing is handled twice.
+* **Polling, on a budget, is the only inbound path.** Hot threads (a session at work or recent
+  activity) are read every few seconds and the trigger conversations every few seconds more. All the
+  other tracked threads, however many, share one `search.messages` sweep every 20 seconds: a reply
+  anywhere wakes its thread. The reads stay well inside Slack's rate limits, and the cost of watching a
+  quiet thread is close to zero. Each workspace keeps a watermark of how far it has read
+  (`state.json`); after a restart or a wake from sleep, polling simply continues from there, at most
+  `catch_up` back. Each session records the message timestamps it has seen, so nothing is handled
+  twice.
 
 More in [SETUP.md § How a session behaves](SETUP.md#4-how-a-session-behaves).
 
@@ -162,9 +167,11 @@ tags. A reply that was posted while agent-shift was offline is marked as such.
 
 ## Close the laptop
 
-Nothing runs while your computer is off or asleep, and Slack gives up on Socket Mode events it
-cannot deliver. In this test the daemon was stopped for three minutes. Meanwhile, a new message was posted
-and someone replied in the thread of an existing session (names and paths changed):
+Nothing runs while your computer is off or asleep, and nothing needs to: Slack isn't trying to
+deliver anything. In this test the daemon was stopped for three minutes. Meanwhile, a new message was
+posted and someone replied in the thread of an existing session (names and paths changed). The test
+predates polling, so its log still shows the old Socket Mode connect line and a separate catch-up
+pass; today the poller's first reads after the restart pick up the same two messages:
 
 ```console
 $ agent-shift logs
@@ -263,14 +270,14 @@ Every protocol line in both directions is written to `sessions/<id>/transcript.j
 
 | Component | What it can do | What keeps it in bounds |
 |---|---|---|
-| Your user token (`xoxp-…`) | Read and write in Slack as you, within the [manifest's user scopes](internal/slack/manifest.go): history of channels, private channels, DMs and group DMs; `chat:write`; reactions; files; users; `search:read`; `team:read` | Stored in the macOS Keychain or Windows Credential Manager (a `0600` `credentials.json` only when no keychain is available), never in `config.yaml`. Only the daemon and its Slack tools use it |
-| App-level token (`xapp-…`) | Open the Socket Mode connection (`connections:write`) | Same store. The app has no bot user and no redirect URL |
+| Your Slack user token (`xoxp-…`) | Read and write in Slack as you, within its scopes: agent-shift needs [these](internal/slack/scopes.go): history of channels, private channels, DMs and group DMs; `chat:write`; reactions; files; users; `search:read`; `team:read` | Stored in the macOS Keychain or Windows Credential Manager (a `0600` `credentials.json` only when no keychain is available), never in `config.yaml`. Only the daemon, its Slack tools and `agent-shift ui` use it. `agent-shift doctor` reports missing scopes |
 | The engine CLI | Whatever `autonomy` allows, in `workdir` or its worktree | `autonomy`, plus the CLI's own sandbox and permission system |
 | The `agentshift` MCP endpoint | Every Slack tool, bound to one session's thread | `127.0.0.1` on a random port, behind a random 192-bit token per session in the path |
 | The control endpoint (CLI ↔ daemon) | Status, session list, interrupt or stop a session, reload, shut down | `127.0.0.1`, behind a bearer token from `daemon.json`, compared in constant time |
+| The configuration UI (`agent-shift ui`) | Change the config, the Slack token, the daemon and autostart | `127.0.0.1`, only while the command runs, behind a random token in the link; other hosts and origins are refused |
 
-**Not involved:** any agent-shift server or cloud service, a Slack bot user, and API keys.
-agent-shift connects to Slack and to `127.0.0.1`. The CLIs connect to their own providers, as they
+**Not involved:** any agent-shift server, a Slack bot user, and model API keys.
+agent-shift connects to `slack.com` and to `127.0.0.1`. The CLIs connect to their own providers, as they
 always do.
 
 ## What a session does and does not mean
@@ -308,7 +315,7 @@ where it belongs:
 * **Its own output never loops back.** Messages carrying the `agentshift_footer` block, and the
   messages, files and reactions each session recorded, are never delivered to an agent or matched as
   triggers.
-* **Tokens stay in the keychain.** The MCP and control endpoints listen on loopback only, behind
+* **Keys stay in the keychain.** The Slack token lives in the OS keychain, never in the config file. The MCP and control endpoints listen on loopback only, behind
   random tokens. `ANTHROPIC_API_KEY` is removed from the Claude environment unless you set it
   yourself.
 
@@ -322,24 +329,25 @@ rather than `full`.
 
 **Requirements:** macOS or Windows, Go 1.26+ (to build), and
 [Claude Code](https://claude.com/claude-code) and/or [Codex CLI](https://developers.openai.com/codex/cli),
-installed and logged in (`claude auth login`, `codex login`). You also need a Slack workspace where you
-may create and install a private app; some workspaces need an admin to approve the install.
+installed and logged in (`claude auth login`, `codex login`). You also need a
+Slack workspace where you may create and install an app for yourself; some workspaces need an admin
+to approve it.
 
 ```sh
 git clone https://github.com/daffirds/agent-shift && cd agent-shift
 # build into any directory on your PATH (name it agent-shift.exe on Windows)
 go build -o ~/.local/bin/agent-shift ./cmd/agent-shift
-agent-shift setup
+agent-shift ui
 ```
 
-`setup` works through four steps:
+`agent-shift ui` opens a small configuration app in your browser (served from `127.0.0.1` while the
+command runs):
 
-1. It checks that the CLIs are installed and logged in.
-2. It opens Slack's *Create app from manifest* page, pre-filled with the user scopes agent-shift
-   needs.
-3. It takes the app-level token (`xapp-…`) and your user token (`xoxp-…`), checks both against
-   Slack, and stores them in the keychain.
-4. It walks you through your first agent and starts the daemon, optionally at login.
+1. **Connect:** **Create app in Slack** opens Slack with the app manifest filled in; create it,
+   install it, and paste its **User OAuth Token** (`xoxp-…`). It also shows whether Claude Code and
+   Codex are installed and logged in.
+2. **Agents:** create your first agent: conversations, senders, filters, prompt, autonomy, model.
+3. **Start daemon** in the top bar, and optionally start at login under **Settings**.
 
 Then post a matching message and watch the thread.
 
@@ -351,15 +359,15 @@ requests.
 
 | Command | Purpose |
 |---|---|
-| `agent-shift setup` | Guided setup: CLIs, Slack, first agent, daemon (safe to re-run) |
+| `agent-shift ui` | Configuration UI in your browser: Slack app and token, agents, daemon (alias `setup`) |
 | `agent-shift start` · `stop` · `restart` | The background daemon (no console window on Windows). Sessions survive `stop` and resume later |
 | `agent-shift run` | The daemon in the foreground with live logs |
 | `agent-shift status` | Daemon, Slack connections and the last catch-up, agents, sessions by state |
 | `agent-shift logs [-f]` | The daemon log |
 | `agent-shift reload` | Apply `config.yaml` edits to the running daemon |
-| `agent-shift agents list` · `add` · `edit` · `show` · `remove` · `enable` · `disable` | Manage agents |
+| `agent-shift agents list` · `show` · `remove` · `enable` · `disable` | Manage agents (create and edit them in `ui`) |
 | `agent-shift agents models [claude\|codex]` | Models and effort levels your CLI logins offer |
-| `agent-shift slack connect` · `list` · `remove` · `manifest` · `find` | Workspaces, the app manifest, and IDs for editing the config by hand |
+| `agent-shift slack list` · `remove` · `find` | Workspaces, and IDs for editing the config by hand |
 | `agent-shift sessions list [-a]` · `show` · `logs` · `interrupt` · `stop` · `prune` | Inspect and control sessions |
 | `agent-shift autostart enable` · `disable` · `status` | A LaunchAgent on macOS, a per-user *Run* entry on Windows |
 | `agent-shift doctor` | Check the CLIs and their logins, Slack tokens and scopes, the config and the daemon |
@@ -371,7 +379,7 @@ daemon automatically.
 
 | Document | Contents |
 |---|---|
-| [SETUP.md](SETUP.md) | Requirements, build and install, the setup wizard and the Slack app |
+| [SETUP.md](SETUP.md) | Requirements, build and install, the Slack app and the configuration UI |
 | [§ 4 How a session behaves](SETUP.md#4-how-a-session-behaves) | Start, steer, stop, idle, slots, restarts, offline catch-up, expiry, errors, and the agent's tools |
 | [§ 6 Configuration file](SETUP.md#6-configuration-file) | Every key of `config.yaml` |
 | [§ 7 Example](SETUP.md#7-example-tickets-from-a-slack-workflow--pull-requests) | Tickets from a Slack workflow turning into draft pull requests |
