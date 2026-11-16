@@ -80,7 +80,7 @@ func NewManager(o Options) *Manager {
 		byThread: map[string]*Session{},
 		byMsg:    map[string]*Session{},
 		ownMsgs:  newTTLSet(24 * time.Hour), ownFiles: newTTLSet(24 * time.Hour),
-		ownReacts: newTTLSet(10 * time.Minute), seen: newTTLSet(time.Hour),
+		ownReacts: newTTLSet(24 * time.Hour), seen: newTTLSet(time.Hour),
 	}
 }
 
