@@ -7,9 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -18,7 +16,6 @@ import (
 	"github.com/daffirds/agent-shift/internal/app"
 	"github.com/daffirds/agent-shift/internal/autostart"
 	"github.com/daffirds/agent-shift/internal/daemon"
-	"github.com/daffirds/agent-shift/internal/proc"
 	"github.com/daffirds/agent-shift/internal/session"
 	"github.com/daffirds/agent-shift/internal/ui"
 )
@@ -68,49 +65,18 @@ func startCmd() *cobra.Command {
 }
 
 func startDaemon(ctx context.Context, quiet bool) error {
-	if c, err := daemon.Connect(); err == nil {
-		if !quiet {
-			ui.OK("Already running (pid %d)", c.Runtime().PID)
-		}
-		return nil
-	}
-	if err := app.EnsureHome(); err != nil {
+	rt, started, err := daemon.Start(ctx)
+	if err != nil {
 		return err
 	}
-	if autostart.Managed() {
-		if err := autostart.Start(); err != nil {
-			return err
+	if !quiet {
+		if started {
+			ui.OK("Daemon started (pid %d) — logs: %s", rt.PID, ui.Dim(app.LogPath()))
+		} else {
+			ui.OK("Already running (pid %d)", rt.PID)
 		}
-	} else {
-		exe, err := os.Executable()
-		if err != nil {
-			return err
-		}
-		out, err := os.OpenFile(app.LogPath()+".stderr", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
-		if err != nil {
-			return err
-		}
-		defer out.Close()
-		cmd := exec.Command(exe, "run", "--background")
-		cmd.Stdout, cmd.Stderr = out, out
-		p, err := proc.StartDetached(cmd)
-		if err != nil {
-			return fmt.Errorf("start daemon: %w", err)
-		}
-		_ = p.Release()
 	}
-	deadline := time.Now().Add(20 * time.Second)
-	for time.Now().Before(deadline) {
-		if c, err := daemon.Connect(); err == nil {
-			if !quiet {
-				ui.OK("Daemon started (pid %d) — logs: %s", c.Runtime().PID, ui.Dim(app.LogPath()))
-			}
-			return nil
-		}
-		time.Sleep(250 * time.Millisecond)
-	}
-	tail, _ := os.ReadFile(app.LogPath() + ".stderr")
-	return fmt.Errorf("daemon did not come up; see %s\n%s", app.LogPath(), strings.TrimSpace(string(tail)))
+	return nil
 }
 
 func stopCmd() *cobra.Command {
@@ -124,28 +90,18 @@ func stopCmd() *cobra.Command {
 }
 
 func stopDaemon(ctx context.Context, quiet bool) error {
-	c, err := daemon.Connect()
+	stopped, err := daemon.Stop(ctx)
 	if err != nil {
-		if !quiet {
-			ui.OK("Not running")
-		}
-		return nil
-	}
-	pid := c.Runtime().PID
-	if err := c.Shutdown(ctx); err != nil {
 		return err
 	}
-	deadline := time.Now().Add(45 * time.Second)
-	for time.Now().Before(deadline) {
-		if !proc.Alive(pid) {
-			if !quiet {
-				ui.OK("Daemon stopped")
-			}
-			return nil
+	if !quiet {
+		if stopped {
+			ui.OK("Daemon stopped")
+		} else {
+			ui.OK("Not running")
 		}
-		time.Sleep(250 * time.Millisecond)
 	}
-	return fmt.Errorf("daemon (pid %d) did not exit in time", pid)
+	return nil
 }
 
 func restartCmd() *cobra.Command {
@@ -209,7 +165,7 @@ func statusCmd() *cobra.Command {
 			})
 			ui.Heading("Slack")
 			if len(st.Workspaces) == 0 {
-				ui.Warn("no workspace connected — run %s", ui.Code("agent-shift slack connect"))
+				ui.Warn("no workspace connected — connect one in %s", ui.Code("agent-shift ui"))
 			}
 			for _, w := range st.Workspaces {
 				if w.Connected {
@@ -223,7 +179,7 @@ func statusCmd() *cobra.Command {
 			}
 			ui.Heading("Agents")
 			if len(st.Agents) == 0 {
-				ui.Warn("no agents — run %s", ui.Code("agent-shift agents add"))
+				ui.Warn("no agents — create one in %s", ui.Code("agent-shift ui"))
 			}
 			for _, a := range st.Agents {
 				state := "on"
