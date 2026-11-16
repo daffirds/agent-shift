@@ -42,7 +42,9 @@ func Start(ctx context.Context) (rt *Runtime, started bool, err error) {
 		if err != nil {
 			return nil, false, fmt.Errorf("start daemon: %w", err)
 		}
-		_ = p.Release()
+		// Reap it when it exits. A long-lived parent (`agent-shift ui`) would otherwise keep a
+		// zombie, which still counts as alive and makes Stop time out.
+		go func() { _, _ = p.Wait() }()
 	}
 	deadline := time.Now().Add(20 * time.Second)
 	for time.Now().Before(deadline) {
