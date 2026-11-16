@@ -1,5 +1,5 @@
-// Package slack is a small Slack Web API + Socket Mode client tailored to acting as a user:
-// it uses a user token (xoxp) for API calls and an app-level token (xapp) for events.
+// Package slack is a small Slack Web API client tailored to acting as a user with a user
+// token (xoxp). agent-shift polls with it; it receives no events.
 package slack
 
 import (
@@ -52,12 +52,16 @@ func IsCode(err error, codes ...string) bool {
 // Client calls the Slack Web API with a single token.
 type Client struct {
 	token string
+	base  string
 	http  *http.Client
 }
 
 func NewClient(token string) *Client {
-	return &Client{token: token, http: &http.Client{Timeout: 60 * time.Second}}
+	return &Client{token: token, base: apiBase, http: &http.Client{Timeout: 60 * time.Second}}
 }
+
+// WithBase points the client at another API root (tests).
+func (c *Client) WithBase(base string) *Client { c.base = base; return c }
 
 type baseResponse struct {
 	OK       bool   `json:"ok"`
@@ -126,7 +130,7 @@ func (c *Client) do(ctx context.Context, method string, params any) ([]byte, err
 		contentType = "application/json; charset=utf-8"
 		body = bytes.NewReader(b)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiBase+method, body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.base+method, body)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +160,7 @@ func (c *Client) do(ctx context.Context, method string, params any) ([]byte, err
 
 // Scopes returns the OAuth scopes granted to the token (auth.test's X-OAuth-Scopes header).
 func (c *Client) Scopes(ctx context.Context) ([]string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiBase+"auth.test", strings.NewReader(""))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.base+"auth.test", strings.NewReader(""))
 	if err != nil {
 		return nil, err
 	}

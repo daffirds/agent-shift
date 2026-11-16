@@ -332,3 +332,44 @@ func (c *Client) SearchMessages(ctx context.Context, query string, count int) ([
 	}, &out)
 	return out.Messages.Matches, out.Messages.Total, err
 }
+
+// SearchPage is one page of search.messages results, newest first.
+type SearchPage struct {
+	Matches []SearchMatch
+	Page    int
+	Pages   int
+}
+
+// SearchRecent runs search.messages sorted newest first and returns one page (1-based).
+func (c *Client) SearchRecent(ctx context.Context, query string, page, count int) (*SearchPage, error) {
+	var out struct {
+		Messages struct {
+			Matches []SearchMatch `json:"matches"`
+			Paging  struct {
+				Page  int `json:"page"`
+				Pages int `json:"pages"`
+			} `json:"paging"`
+		} `json:"messages"`
+	}
+	err := c.Call(ctx, "search.messages", url.Values{
+		"query": {query}, "count": {strconv.Itoa(count)}, "page": {strconv.Itoa(page)},
+		"sort": {"timestamp"}, "sort_dir": {"desc"}, "highlight": {"false"},
+	}, &out)
+	if err != nil {
+		return nil, err
+	}
+	return &SearchPage{Matches: out.Messages.Matches, Page: out.Messages.Paging.Page, Pages: out.Messages.Paging.Pages}, nil
+}
+
+// ThreadTS returns the parent ts of a search hit that is a thread reply ("" otherwise). Search
+// results don't carry thread_ts; the permalink of a reply does.
+func (m *SearchMatch) ThreadTS() string {
+	u, err := url.Parse(m.Permalink)
+	if err != nil {
+		return ""
+	}
+	if ts := u.Query().Get("thread_ts"); ts != "" && ts != m.TS {
+		return ts
+	}
+	return ""
+}
