@@ -25,19 +25,6 @@ type Workspace struct {
 	UserName string
 	API      *slack.Client
 	Dir      *slack.Directory
-
-	appID atomic.Value // string; our Slack app's ID, learned from incoming events
-}
-
-func (w *Workspace) AppID() string {
-	v, _ := w.appID.Load().(string)
-	return v
-}
-
-func (w *Workspace) SetAppID(id string) {
-	if id != "" {
-		w.appID.Store(id)
-	}
 }
 
 // Manager owns all sessions and routes Slack events to them.
@@ -98,9 +85,6 @@ func (m *Manager) Config() *config.Config { return m.cfg.Load() }
 func (m *Manager) SetWorkspace(w *Workspace) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if old := m.ws[w.TeamID]; old != nil {
-		w.SetAppID(old.AppID())
-	}
 	m.ws[w.TeamID] = w
 	for _, s := range m.sessions {
 		if s.rec.TeamID == w.TeamID {
@@ -245,14 +229,13 @@ func (m *Manager) end(s *Session) {
 
 // HandleEvent routes one Slack event. It may call the Slack API, so callers should
 // invoke it from a worker (one per workspace keeps per-thread ordering), not the socket loop.
-func (m *Manager) HandleEvent(ctx context.Context, ev *slack.Event, appID string) {
+func (m *Manager) HandleEvent(ctx context.Context, ev *slack.Event) {
 	m.mu.Lock()
 	ws := m.ws[ev.TeamID]
 	m.mu.Unlock()
 	if ws == nil {
 		return
 	}
-	ws.SetAppID(appID)
 	if ev.EventID != "" && !m.seen.addNew("ev/"+ev.EventID) {
 		return
 	}
@@ -267,9 +250,6 @@ func (m *Manager) HandleEvent(ctx context.Context, ev *slack.Event, appID string
 // isOwn reports whether a message was posted by agent-shift (as opposed to typed by the user).
 func (m *Manager) isOwn(ws *Workspace, msg *slack.Message) bool {
 	if msg.HasBlockID(slack.FooterBlockID) || m.ownMsgs.has(threadKey(ws.TeamID, msg.Channel, msg.TS)) {
-		return true
-	}
-	if id := ws.AppID(); id != "" && msg.AppID == id {
 		return true
 	}
 	if len(msg.Files) > 0 {

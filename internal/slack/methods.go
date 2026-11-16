@@ -38,14 +38,6 @@ func (c *Client) TeamInfo(ctx context.Context) (*Team, error) {
 	return &out.Team, c.Call(ctx, "team.info", nil, &out)
 }
 
-// ConnectionsOpen returns a Socket Mode WebSocket URL. Requires an app-level token.
-func (c *Client) ConnectionsOpen(ctx context.Context) (string, error) {
-	var out struct {
-		URL string `json:"url"`
-	}
-	return out.URL, c.Call(ctx, "apps.connections.open", nil, &out)
-}
-
 func (c *Client) ConversationInfo(ctx context.Context, id string) (*Conversation, error) {
 	var out struct {
 		Channel Conversation `json:"channel"`

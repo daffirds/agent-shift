@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"runtime"
-	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -15,15 +14,13 @@ import (
 	"github.com/daffirds/agent-shift/internal/config"
 	"github.com/daffirds/agent-shift/internal/daemon"
 	"github.com/daffirds/agent-shift/internal/engine"
-	"github.com/daffirds/agent-shift/internal/secret"
-	"github.com/daffirds/agent-shift/internal/slack"
 	"github.com/daffirds/agent-shift/internal/ui"
 )
 
 func doctorCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "doctor",
-		Short: "Check CLIs, logins, Slack tokens/scopes and the daemon",
+		Short: "Check CLIs, logins, Slack tokens and the daemon",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := loadConfig()
 			if err != nil {
@@ -44,29 +41,20 @@ func doctorCmd() *cobra.Command {
 
 			ui.Heading("Slack")
 			if len(cfg.Workspaces) == 0 {
-				ui.Fail("no workspace connected — run %s", ui.Code("agent-shift slack connect"))
+				ui.Fail("no workspace connected — connect one in %s", ui.Code("agent-shift ui"))
 				problems++
 			}
 			for _, w := range cfg.Workspaces {
-				if err := checkWorkspace(cmd.Context(), &w); err != nil {
+				missing, err := checkWorkspace(cmd.Context(), &w)
+				if err != nil {
 					ui.Fail("%s: %v", w.Name, err)
 					problems++
 					continue
 				}
-				ui.OK("%s: tokens valid (as %s)", w.Name, w.UserName)
-				if tok, err := secret.Get(w.TeamID, secret.UserToken); err == nil {
-					if scopes, err := slack.NewClient(tok).Scopes(cmd.Context()); err == nil {
-						var missing []string
-						for _, s := range slack.UserScopes {
-							if !slices.Contains(scopes, s) {
-								missing = append(missing, s)
-							}
-						}
-						if len(missing) > 0 {
-							ui.Warn("%s: missing scopes %s (update the app from `agent-shift slack manifest` and reinstall)", w.Name, strings.Join(missing, ", "))
-							problems++
-						}
-					}
+				ui.OK("%s: token works, acting as %s", w.Name, w.UserName)
+				if len(missing) > 0 {
+					ui.Warn("%s: the token is missing Slack scopes %s (add them to the app and reinstall it)", w.Name, strings.Join(missing, ", "))
+					problems++
 				}
 			}
 
@@ -80,7 +68,7 @@ func doctorCmd() *cobra.Command {
 				problems++
 			}
 			if len(cfg.Agents) == 0 {
-				ui.Warn("no agents — run %s", ui.Code("agent-shift agents add"))
+				ui.Warn("no agents — create one in %s", ui.Code("agent-shift ui"))
 			}
 			for _, a := range cfg.Agents {
 				if _, err := engine.Find(a.Engine, binaryOf(cfg, a.Engine).Path); err != nil {

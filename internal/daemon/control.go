@@ -66,14 +66,18 @@ func (d *daemon) handleStatus(w http.ResponseWriter, _ *http.Request) {
 	d.mu.Lock()
 	for _, wcfg := range cfg.Workspaces {
 		ws := WorkspaceStatus{TeamID: wcfg.TeamID, Name: wcfg.Name, User: wcfg.UserName}
+		ws.Synced = d.marks.get(wcfg.TeamID)
 		if c := d.conns[wcfg.TeamID]; c != nil {
-			ws.Connected = c.connected.Load()
-			ws.Since, _ = c.since.Load().(time.Time)
-			ws.Error, _ = c.lastErr.Load().(string)
-			ws.Synced = d.marks.get(wcfg.TeamID)
-			ws.CatchUp = c.catchUp.Load()
-		} else {
-			ws.Error = "no tokens; run `agent-shift slack connect`"
+			ws.Error, _ = c.err.Load().(string)
+			if p := c.poller.Load(); p != nil {
+				ps := p.Status()
+				ws.Poll = &ps
+				ws.Since = ps.LastOK
+				ws.Connected = ws.Error == "" && !ps.LastOK.IsZero() && time.Since(ps.LastOK) < 2*time.Minute
+				if !ws.Connected && ws.Error == "" {
+					ws.Error = ps.Error
+				}
+			}
 		}
 		st.Workspaces = append(st.Workspaces, ws)
 	}

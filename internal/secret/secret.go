@@ -1,11 +1,13 @@
-// Package secret stores Slack tokens in the OS keychain (macOS Keychain, Windows Credential
-// Manager), falling back to a private JSON file when no keychain is available.
+// Package secret stores agent-shift's secrets in the OS keychain (macOS Keychain, Windows
+// Credential Manager), falling back to a private JSON file when no keychain is available.
+// The secrets are Slack user tokens (xoxp-…), one per workspace.
 package secret
 
 import (
 	"encoding/json"
 	"errors"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/zalando/go-keyring"
@@ -18,26 +20,29 @@ var ErrNotFound = errors.New("secret not found")
 
 const service = app.Name
 
-// Token kinds stored per workspace.
-const (
-	UserToken = "user_token" // xoxp-… acts as the user
-	AppToken  = "app_token"  // xapp-… opens the Socket Mode connection
-)
+// SlackToken names a workspace's user token. The name matches what earlier versions stored.
+func SlackToken(teamID string) string { return teamID + "/user_token" }
 
-func key(teamID, kind string) string { return teamID + "/" + kind }
+// legacyAppToken is the Socket Mode app token earlier versions stored; it is no longer used.
+func legacyAppToken(teamID string) string { return teamID + "/app_token" }
+
+// DeleteWorkspace removes every secret of a workspace.
+func DeleteWorkspace(teamID string) error {
+	return errors.Join(Delete(SlackToken(teamID)), Delete(legacyAppToken(teamID)))
+}
 
 var mu sync.Mutex
 
-// Get returns a workspace token.
-func Get(teamID, kind string) (string, error) {
+// Get returns a secret.
+func Get(name string) (string, error) {
 	mu.Lock()
 	defer mu.Unlock()
-	v, err := keyring.Get(service, key(teamID, kind))
+	v, err := keyring.Get(service, name)
 	if err == nil {
 		return v, nil
 	}
 	if file, ferr := readFile(); ferr == nil {
-		if v, ok := file[key(teamID, kind)]; ok {
+		if v, ok := file[name]; ok {
 			return v, nil
 		}
 	}
@@ -47,37 +52,47 @@ func Get(teamID, kind string) (string, error) {
 	return "", err
 }
 
-// Set stores a workspace token, preferring the OS keychain.
-func Set(teamID, kind, value string) error {
+// Set stores a secret, preferring the OS keychain.
+func Set(name, value string) error {
 	mu.Lock()
 	defer mu.Unlock()
-	if err := keyring.Set(service, key(teamID, kind), value); err == nil {
+	if err := keyring.Set(service, name, value); err == nil {
 		// Make sure a stale fallback copy doesn't shadow the keychain value later.
-		_ = deleteFromFile(key(teamID, kind))
+		_ = deleteFromFile(name)
 		return nil
 	}
 	file, _ := readFile()
 	if file == nil {
 		file = map[string]string{}
 	}
-	file[key(teamID, kind)] = value
+	file[name] = value
 	return writeFile(file)
 }
 
-// Delete removes all tokens of a workspace.
-func Delete(teamID string) error {
+// Delete removes a secret.
+func Delete(name string) error {
 	mu.Lock()
 	defer mu.Unlock()
 	var errs []error
-	for _, kind := range []string{UserToken, AppToken} {
-		if err := keyring.Delete(service, key(teamID, kind)); err != nil && !errors.Is(err, keyring.ErrNotFound) {
-			errs = append(errs, err)
-		}
-		if err := deleteFromFile(key(teamID, kind)); err != nil {
-			errs = append(errs, err)
-		}
+	if err := keyring.Delete(service, name); err != nil && !errors.Is(err, keyring.ErrNotFound) {
+		errs = append(errs, err)
+	}
+	if err := deleteFromFile(name); err != nil {
+		errs = append(errs, err)
 	}
 	return errors.Join(errs...)
+}
+
+// Hint is a safe-to-show fragment of a secret ("xoxp-…3f9c").
+func Hint(v string) string {
+	if len(v) <= 8 {
+		return "…"
+	}
+	pre := v[:3]
+	if i := strings.IndexAny(v, "_-"); i > 0 && i < 6 {
+		pre = v[:i+1]
+	}
+	return pre + "…" + v[len(v)-4:]
 }
 
 func readFile() (map[string]string, error) {

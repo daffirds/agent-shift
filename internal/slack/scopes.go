@@ -6,6 +6,7 @@ import (
 )
 
 // UserScopes are the user-token scopes agent-shift needs to read and act as the user.
+// search:read lets one search.messages call find new replies in every tracked thread.
 var UserScopes = []string{
 	"channels:history", "channels:read",
 	"groups:history", "groups:read",
@@ -19,13 +20,28 @@ var UserScopes = []string{
 	"team:read",
 }
 
-// UserEvents are delivered for conversations the user is a member of.
-var UserEvents = []string{
-	"message.channels", "message.groups", "message.im", "message.mpim",
-	"reaction_added", "reaction_removed",
+// MissingScopes returns the UserScopes not in granted. It returns nil when granted is empty
+// (the scopes could not be determined).
+func MissingScopes(granted []string) []string {
+	if len(granted) == 0 {
+		return nil
+	}
+	have := map[string]bool{}
+	for _, s := range granted {
+		have[s] = true
+	}
+	var out []string
+	for _, s := range UserScopes {
+		if !have[s] {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
-// Manifest returns the Slack app manifest (YAML) for a user-token-only Socket Mode app.
+// Manifest returns the Slack app manifest (YAML) for agent-shift's app: user-token scopes
+// only. It subscribes to no events and has no Socket Mode, because agent-shift polls; Slack
+// therefore has nothing to deliver, and nothing to switch off, while the computer is offline.
 func Manifest(appName string) string {
 	var b strings.Builder
 	b.WriteString("_metadata:\n  major_version: 1\n")
@@ -37,12 +53,9 @@ func Manifest(appName string) string {
 	for _, s := range UserScopes {
 		b.WriteString("      - " + s + "\n")
 	}
-	b.WriteString("settings:\n  event_subscriptions:\n    user_events:\n")
-	for _, e := range UserEvents {
-		b.WriteString("      - " + e + "\n")
-	}
+	b.WriteString("settings:\n")
 	b.WriteString("  org_deploy_enabled: false\n")
-	b.WriteString("  socket_mode_enabled: true\n")
+	b.WriteString("  socket_mode_enabled: false\n")
 	b.WriteString("  token_rotation_enabled: false\n")
 	return b.String()
 }
@@ -52,7 +65,7 @@ func CreateAppURL(manifest string) string {
 	return "https://api.slack.com/apps?new_app=1&manifest_yaml=" + url.QueryEscape(manifest)
 }
 
-// AppSettingsURL links to a page of an app's settings (e.g. "general", "install-on-team").
+// AppSettingsURL links to a page of an app's settings (e.g. "oauth", "install-on-team").
 func AppSettingsURL(appID, page string) string {
 	if appID == "" {
 		return "https://api.slack.com/apps"

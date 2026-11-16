@@ -20,7 +20,7 @@ import (
 	"github.com/daffirds/agent-shift/internal/engine"
 	"github.com/daffirds/agent-shift/internal/engine/claude"
 	"github.com/daffirds/agent-shift/internal/engine/codex"
-	"github.com/daffirds/agent-shift/internal/secret"
+	"github.com/daffirds/agent-shift/internal/link"
 	"github.com/daffirds/agent-shift/internal/slack"
 	"github.com/daffirds/agent-shift/internal/ui"
 )
@@ -299,11 +299,11 @@ func agentForm(ctx context.Context, cfg *config.Config, existing *config.Agent) 
 	if ws.TeamID != a.Trigger.Workspace {
 		a.Trigger = config.Trigger{Workspace: ws.TeamID}
 	}
-	tok, err := secret.Get(ws.TeamID, secret.UserToken)
+	api, err := link.Slack(ws)
 	if err != nil {
-		return nil, fmt.Errorf("no token for %s; run agent-shift slack connect", ws.Name)
+		return nil, fmt.Errorf("%s: %w", ws.Name, err)
 	}
-	dir := slack.NewDirectory(slack.NewClient(tok))
+	dir := slack.NewDirectory(api)
 
 	ui.Heading("Trigger")
 	convs, err := pickConversations(ctx, dir, ws, a.Trigger.Conversations)

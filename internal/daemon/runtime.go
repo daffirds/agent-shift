@@ -101,14 +101,14 @@ type Status struct {
 }
 
 type WorkspaceStatus struct {
-	TeamID    string         `json:"team_id"`
-	Name      string         `json:"name"`
-	User      string         `json:"user"`
-	Connected bool           `json:"connected"`
-	Since     time.Time      `json:"since"`
-	Error     string         `json:"error,omitempty"`
-	Synced    time.Time      `json:"synced"`             // events received up to here
-	CatchUp   *CatchUpStatus `json:"catch_up,omitempty"` // the last replay after downtime
+	TeamID    string              `json:"team_id"`
+	Name      string              `json:"name"`
+	User      string              `json:"user"`
+	Connected bool                `json:"connected"`
+	Since     time.Time           `json:"since"`
+	Error     string              `json:"error,omitempty"`
+	Synced    time.Time           `json:"synced"`         // everything posted before this has been seen
+	Poll      *session.PollStatus `json:"poll,omitempty"` // what polling is doing
 }
 
 type AgentStatus struct {

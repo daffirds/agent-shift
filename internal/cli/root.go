@@ -30,7 +30,6 @@ Get started with:  ` + app.Name + ` setup`,
 		Version:       app.Version,
 	}
 	root.AddCommand(
-		setupCmd(),
 		runCmd(), startCmd(), stopCmd(), restartCmd(), statusCmd(), logsCmd(), reloadCmd(),
 		slackCmd(), agentsCmd(), sessionsCmd(), autostartCmd(), doctorCmd(),
 	)

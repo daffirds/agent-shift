@@ -217,7 +217,7 @@ func statusCmd() *cobra.Command {
 				} else {
 					ui.Fail("%s: %s", ui.Bold(w.Name), firstNonEmpty(w.Error, "connecting…"))
 				}
-				if line := catchUpLine(w.CatchUp); line != "" {
+				if line := pollLine(w.Poll); line != "" {
 					ui.Info("%s", ui.Dim(line))
 				}
 			}
@@ -316,20 +316,22 @@ func tailFile(ctx context.Context, path string, n int, follow bool) error {
 	}
 }
 
-// catchUpLine describes the last replay after downtime, if there was a real gap or it did something.
-func catchUpLine(cu *daemon.CatchUpStatus) string {
-	if cu == nil {
+// pollLine summarises what a workspace's poller is doing.
+func pollLine(p *session.PollStatus) string {
+	if p == nil {
 		return ""
 	}
-	offline := cu.At.Sub(cu.From)
-	switch {
-	case cu.Error != "":
-		return fmt.Sprintf("catching up on %s offline — incomplete, retrying: %s", span(offline), cu.Error)
-	case cu.Sessions+cu.Replies == 0 && offline < 5*time.Minute:
-		return ""
+	line := fmt.Sprintf("polling %s and %s (%d active)", plural(p.Conversations, "conversation", "conversations"),
+		plural(p.Threads, "thread", "threads"), p.Hot)
+	if p.Search != "" && p.Search != "on" && p.Search != "idle" {
+		line += " · search " + p.Search
 	}
-	return fmt.Sprintf("caught up %s on %s offline: %s, %s", ago(cu.At), span(offline),
-		plural(cu.Sessions, "new session", "new sessions"), plural(cu.Replies, "thread reply", "thread replies"))
+	if !p.Covered.IsZero() {
+		if behind := time.Since(p.Covered); behind > 3*time.Minute {
+			line += " · catching up on " + span(behind)
+		}
+	}
+	return line
 }
 
 func plural(n int, one, many string) string {
