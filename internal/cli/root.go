@@ -24,20 +24,17 @@ func Execute() int {
 whenever a message matches one of your agents. Replies and reactions in the thread are
 steered into the same session, and the agent answers through Slack tools.
 
-Get started with:  ` + app.Name + ` setup`,
+Get started with:  ` + app.Name + ` ui   (connect Slack, create agents)`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Version:       app.Version,
 	}
 	root.AddCommand(
+		uiCmd(),
 		runCmd(), startCmd(), stopCmd(), restartCmd(), statusCmd(), logsCmd(), reloadCmd(),
 		slackCmd(), agentsCmd(), sessionsCmd(), autostartCmd(), doctorCmd(),
 	)
 	if err := root.ExecuteContext(context.Background()); err != nil {
-		if errors.Is(err, ui.ErrAborted) {
-			ui.Line("%s", ui.Dim("Cancelled."))
-			return 130
-		}
 		ui.Fail("%v", err)
 		return 1
 	}

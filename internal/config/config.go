@@ -4,6 +4,7 @@ package config
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -84,57 +85,58 @@ type Binary struct {
 	Env map[string]string `yaml:"env,omitempty"`
 }
 
-// Workspace is a connected Slack workspace. Tokens live in the OS keychain, not here.
+// Workspace is a Slack workspace agent-shift polls with your user token (kept in the OS keychain).
 type Workspace struct {
-	TeamID   string `yaml:"team_id"`
-	Name     string `yaml:"name"`
-	URL      string `yaml:"url,omitempty"`
-	UserID   string `yaml:"user_id"`
-	UserName string `yaml:"user_name,omitempty"`
-	AppID    string `yaml:"app_id,omitempty"`
+	TeamID   string `yaml:"team_id" json:"team_id"`
+	Name     string `yaml:"name" json:"name"`
+	URL      string `yaml:"url,omitempty" json:"url,omitempty"`
+	UserID   string `yaml:"user_id" json:"user_id"`
+	UserName string `yaml:"user_name,omitempty" json:"user_name,omitempty"`
+	// AppID is the Slack app the token belongs to (for links to its settings).
+	AppID string `yaml:"app_id,omitempty" json:"app_id,omitempty"`
 }
 
 type Agent struct {
-	Name     string `yaml:"name"`
-	Disabled bool   `yaml:"disabled,omitempty"`
-	Engine   string `yaml:"engine"`
+	Name     string `yaml:"name" json:"name"`
+	Disabled bool   `yaml:"disabled,omitempty" json:"disabled,omitempty"`
+	Engine   string `yaml:"engine" json:"engine"`
 	// Model and Effort (reasoning effort) choose from what the engine's CLI offers
 	// (`agent-shift agents models`). Empty uses the CLI's own default.
-	Model  string `yaml:"model,omitempty"`
-	Effort string `yaml:"effort,omitempty"`
+	Model  string `yaml:"model,omitempty" json:"model,omitempty"`
+	Effort string `yaml:"effort,omitempty" json:"effort,omitempty"`
 	// Workdir is where the CLI session runs.
-	Workdir string `yaml:"workdir"`
+	Workdir string `yaml:"workdir" json:"workdir"`
 	// Worktree runs each session in its own git worktree of Workdir, so parallel sessions don't collide.
-	Worktree     bool    `yaml:"worktree,omitempty"`
-	Autonomy     string  `yaml:"autonomy,omitempty"`
-	SystemPrompt string  `yaml:"system_prompt,omitempty"`
-	Trigger      Trigger `yaml:"trigger"`
+	Worktree     bool    `yaml:"worktree,omitempty" json:"worktree,omitempty"`
+	Autonomy     string  `yaml:"autonomy,omitempty" json:"autonomy,omitempty"`
+	SystemPrompt string  `yaml:"system_prompt,omitempty" json:"system_prompt,omitempty"`
+	Trigger      Trigger `yaml:"trigger" json:"trigger"`
 	// ThreadFrom limits who can steer the session from the thread. Empty means anyone in the thread.
-	ThreadFrom []Ref `yaml:"thread_from,omitempty"`
+	ThreadFrom []Ref `yaml:"thread_from,omitempty" json:"thread_from,omitempty"`
 	// Footer is appended to every Slack message the agent sends. Default: "Assisted by Claude|Codex".
-	Footer string `yaml:"footer,omitempty"`
+	Footer string `yaml:"footer,omitempty" json:"footer,omitempty"`
 	// ExtraArgs: claude → extra CLI flags; codex → extra `key=value` config overrides.
-	ExtraArgs []string `yaml:"extra_args,omitempty"`
+	ExtraArgs []string `yaml:"extra_args,omitempty" json:"extra_args,omitempty"`
 }
 
 // Trigger decides which parent-level Slack messages start a new session.
 type Trigger struct {
-	Workspace string `yaml:"workspace"`
+	Workspace string `yaml:"workspace" json:"workspace"`
 	// Conversations: channels, private channels, DMs or group DMs (by ID).
-	Conversations []Ref `yaml:"conversations"`
+	Conversations []Ref `yaml:"conversations" json:"conversations"`
 	// From limits who can trigger (user IDs, bot IDs, or "me"). Empty means anyone.
-	From []Ref `yaml:"from,omitempty"`
+	From []Ref `yaml:"from,omitempty" json:"from,omitempty"`
 	// Contains matches if the message contains any of these strings (case-insensitive). Empty means any.
-	Contains []string `yaml:"contains,omitempty"`
+	Contains []string `yaml:"contains,omitempty" json:"contains,omitempty"`
 	// Regex additionally requires the message to match this regular expression.
-	Regex string `yaml:"regex,omitempty"`
+	Regex string `yaml:"regex,omitempty" json:"regex,omitempty"`
 }
 
 // Ref is a Slack ID with an optional human-readable name (the name is only for readability).
 // In YAML it can be written as a plain string ("C0123") or as {id, name}.
 type Ref struct {
-	ID   string `yaml:"id"`
-	Name string `yaml:"name,omitempty"`
+	ID   string `yaml:"id" json:"id"`
+	Name string `yaml:"name,omitempty" json:"name,omitempty"`
 }
 
 func (r *Ref) UnmarshalYAML(n *yaml.Node) error {
@@ -338,6 +340,34 @@ func (c *Config) RemoveWorkspace(teamID string) bool {
 	return len(c.Workspaces) != n
 }
 
+// UnmarshalJSON also reads agents saved before Agent had JSON tags (session snapshots), whose
+// keys were the Go field names. Most match the tags case-insensitively; these three don't.
+func (a *Agent) UnmarshalJSON(b []byte) error {
+	type plain Agent
+	var p plain
+	if err := json.Unmarshal(b, &p); err != nil {
+		return err
+	}
+	var legacy struct {
+		SystemPrompt string
+		ThreadFrom   []Ref
+		ExtraArgs    []string
+	}
+	if json.Unmarshal(b, &legacy) == nil {
+		if p.SystemPrompt == "" {
+			p.SystemPrompt = legacy.SystemPrompt
+		}
+		if p.ThreadFrom == nil {
+			p.ThreadFrom = legacy.ThreadFrom
+		}
+		if p.ExtraArgs == nil {
+			p.ExtraArgs = legacy.ExtraArgs
+		}
+	}
+	*a = Agent(p)
+	return nil
+}
+
 // EngineLabel is the human name of the agent's engine ("Claude" / "Codex").
 func (a *Agent) EngineLabel() string {
 	if a.Engine == EngineCodex {
@@ -370,7 +400,7 @@ func LoadFile(path string) (*Config, error) {
 	return cfg, nil
 }
 
-const header = `# agent-shift configuration — edit by hand or with ` + "`agent-shift setup` / `agent-shift agents`" + `.
+const header = `# agent-shift configuration — edit by hand or in the web UI (` + "`agent-shift ui`" + `).
 # Apply changes to a running daemon with ` + "`agent-shift reload`" + `.
 # Slack tokens are stored in your OS keychain, not in this file.
 `

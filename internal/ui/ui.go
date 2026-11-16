@@ -1,19 +1,14 @@
-// Package ui holds terminal styling and interactive form helpers shared by the CLI.
+// Package ui holds terminal styling helpers shared by the CLI.
 package ui
 
 import (
 	"context"
 	"fmt"
-	"io"
-	"os"
 	"os/exec"
 	"runtime"
 	"strings"
 
-	"charm.land/huh/v2"
-	"charm.land/huh/v2/spinner"
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/term"
 
 	"github.com/daffirds/agent-shift/internal/proc"
 )
@@ -75,72 +70,10 @@ func KV(rows [][2]string) {
 	}
 }
 
-// Accessible reports whether forms should use plain line-by-line prompts: requested via
-// AGENT_SHIFT_ACCESSIBLE=1 / ACCESSIBLE=1, or forced because stdin/stdout is not a terminal.
-func Accessible() bool {
-	if os.Getenv("AGENT_SHIFT_ACCESSIBLE") != "" || os.Getenv("ACCESSIBLE") != "" {
-		return true
-	}
-	return !IsTerminal(os.Stdin) || !IsTerminal(os.Stdout)
-}
-
-// IsTerminal reports whether f is an interactive console (NUL / pipes are not).
-func IsTerminal(f *os.File) bool { return term.IsTerminal(f.Fd()) }
-
-// Form runs the given groups as one form with the agent-shift theme.
-func Form(groups ...*huh.Group) error {
-	f := huh.NewForm(groups...).WithTheme(huh.ThemeFunc(huh.ThemeCharm)).WithAccessible(Accessible())
-	if !IsTerminal(os.Stdin) {
-		f = f.WithInput(lineReader{os.Stdin}) // piped answers (scripts): one per prompt
-	}
-	err := f.Run()
-	if err == huh.ErrUserAborted {
-		return ErrAborted
-	}
-	return err
-}
-
-// ErrAborted is returned when the user cancels a form (Ctrl+C / Esc).
-var ErrAborted = fmt.Errorf("cancelled")
-
-// lineReader returns at most one line per Read. huh's accessible prompts each wrap the
-// input in a new buffered scanner; without this, the first prompt would swallow every
-// piped answer meant for the following ones.
-type lineReader struct{ r io.Reader }
-
-func (l lineReader) Read(p []byte) (int, error) {
-	n := 0
-	var b [1]byte
-	for n < len(p) {
-		m, err := l.r.Read(b[:])
-		if m == 1 {
-			p[n] = b[0]
-			n++
-			if b[0] == '\n' {
-				return n, nil
-			}
-		}
-		if err != nil {
-			return n, err
-		}
-	}
-	return n, nil
-}
-
-// Spin runs fn while showing a spinner.
+// Spin runs fn after saying what it is doing.
 func Spin(text string, fn func(ctx context.Context) error) error {
-	if Accessible() {
-		lipgloss.Println("  " + dim.Render(text+"…"))
-		return fn(context.Background())
-	}
-	return spinner.New().Title(" " + text).ActionWithErr(fn).Run()
-}
-
-// Confirm asks a yes/no question.
-func Confirm(question, description string, def bool) (bool, error) {
-	v := def
-	err := Form(huh.NewGroup(huh.NewConfirm().Title(question).Description(description).Value(&v)))
-	return v, err
+	lipgloss.Println("  " + dim.Render(text+"…"))
+	return fn(context.Background())
 }
 
 // OpenBrowser opens url in the default browser (best-effort).
